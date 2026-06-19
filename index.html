@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Happy Birthday, Ma'am Gin ✦</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000}
+canvas{position:fixed;inset:0;display:block}
+#c0{z-index:1}  /* deep bg */
+#c1{z-index:2}  /* garden / bouquet */
+#c2{z-index:3}  /* scissors */
+#c3{z-index:4}  /* fx: fireworks, sparkles */
+
+#msg{
+  position:fixed;z-index:10;
+  top:7%;left:50%;transform:translateX(-50%);
+  text-align:center;pointer-events:none;
+  opacity:0;transition:opacity 1.8s ease;
+}
+#msg h1{
+  font-family:'Pinyon Script',cursive;
+  font-size:clamp(2.2rem,6.5vw,4.8rem);
+  background:linear-gradient(100deg,#b8860b 0%,#f5d060 25%,#fffbe8 50%,#f5d060 75%,#b8860b 100%);
+  background-size:300% 100%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 22px #f5d06077) drop-shadow(0 0 55px #c8922a44);
+  animation:goldShimmer 3s linear infinite;
+  white-space:nowrap;
+}
+#msg p{
+  font-family:'Cormorant Garamond',serif;font-style:italic;
+  font-size:clamp(.8rem,2.2vw,1.15rem);
+  letter-spacing:.35em;color:rgba(245,208,96,.6);
+  margin-top:.45rem;
+}
+@keyframes goldShimmer{0%{background-position:-100% 0}100%{background-position:200% 0}}
+#msg.show{opacity:1}
+
+#replay{
+  position:fixed;z-index:20;
+  bottom:5%;left:50%;transform:translateX(-50%);
+  padding:13px 52px;border:none;border-radius:60px;
+  font-family:'Cormorant Garamond',serif;font-size:1.1rem;letter-spacing:.22em;
+  background:linear-gradient(120deg,#b8860b,#f5d060,#fffbe8,#f5d060,#b8860b);
+  color:#1a0800;cursor:pointer;
+  opacity:0;pointer-events:none;
+  transition:opacity .9s ease,box-shadow .25s,transform .2s;
+  box-shadow:0 0 28px #f5d06033;
+}
+#replay.show{opacity:1;pointer-events:all}
+#replay:hover{box-shadow:0 0 60px #f5d06099;transform:translateX(-50%) scale(1.07)}
+#replay:active{transform:translateX(-50%) scale(.96)}
+
+.kiss{
+  position:fixed;z-index:9;font-size:1.5rem;
+  pointer-events:none;opacity:0;
+  animation:riseKiss linear forwards;
+}
+@keyframes riseKiss{
+  0%{opacity:0;transform:translateY(0) rotate(-8deg) scale(.7)}
+  12%{opacity:.95}80%{opacity:.55}
+  100%{opacity:0;transform:translateY(-60vh) rotate(12deg) scale(1.15)}
+}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@1,300;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+<canvas id="c0"></canvas>
+<canvas id="c1"></canvas>
+<canvas id="c2"></canvas>
+<canvas id="c3"></canvas>
+<div id="msg"><h1>Happy Birthday, Ma'am Gin</h1><p>✦ With love &amp; twenty-five roses ✦</p></div>
+<button id="replay">↺ &nbsp; Replay</button>
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CANVAS SETUP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const C0=document.getElementById('c0'),C1=document.getElementById('c1'),
+      C2=document.getElementById('c2'),C3=document.getElementById('c3');
+const X0=C0.getContext('2d'),X1=C1.getContext('2d'),
+      X2=C2.getContext('2d'),X3=C3.getContext('2d');
+let W,H,DPR=1;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,3);
+  W=window.innerWidth;
+  H=window.innerHeight;
+  [C0,C1,C2,C3].forEach(c=>{
+    c.width=Math.round(W*DPR);
+    c.height=Math.round(H*DPR);
+    c.style.width=W+'px';
+    c.style.height=H+'px';
+  });
+  [X0,X1,X2,X3].forEach(x=>{
+    x.setTransform(1,0,0,1,0,0);
+    x.scale(DPR,DPR);
+  });
+}
+resize();
+window.addEventListener('resize',()=>{resize();});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// HAPPY BIRTHDAY MELODY
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let audioCtx=null;
+function playBirthdaySong(){
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const master=audioCtx.createGain();master.gain.value=.35;master.connect(audioCtx.destination);
+    // HB melody: [freq,beat_length] — 4/4 at ~90bpm → beat=0.667s
+    const B=0.55;
+    const mel=[
+      [392,.5],[392,.25],[440,.75],[392,.75],[523,.75],[494,1.5],[0,.25],
+      [392,.5],[392,.25],[440,.75],[392,.75],[587,.75],[523,1.5],[0,.25],
+      [392,.5],[392,.25],[784,.75],[659,.75],[523,.75],[494,.75],[440,1.5],[0,.25],
+      [698,.5],[698,.25],[659,.75],[523,.75],[587,.75],[523,1.75]
+    ];
+    let t=audioCtx.currentTime+.15;
+    mel.forEach(([f,len])=>{
+      if(f===0){t+=len*B;return;}
+      const o=audioCtx.createOscillator();
+      const g=audioCtx.createGain();
+      // warm bell-like tone
+      o.type='sine';
+      const o2=audioCtx.createOscillator();o2.type='triangle';
+      const g2=audioCtx.createGain();g2.gain.value=.12;
+      o2.frequency.value=f*2;
+      o2.connect(g2);g2.connect(master);
+      o.frequency.value=f;
+      o.connect(g);g.connect(master);
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(.22,t+.04);
+      g.gain.setValueAtTime(.2,t+len*B-.07);
+      g.gain.linearRampToValueAtTime(0,t+len*B);
+      o.start(t);o.stop(t+len*B+.05);
+      o2.start(t);o2.stop(t+len*B+.05);
+      t+=len*B;
+    });
+  }catch(e){}
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ROSE DATA — 25 roses
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const NROSES=25;
+let roses=[];
+
+function seedRoses(){
+  roses=[];
+  // distribute across 5 rows of 5, with natural offsets
+  const cols=5,rows=5;
+  for(let i=0;i<NROSES;i++){
+    const col=i%cols, row=Math.floor(i/cols);
+    const xBase=W*(0.08+col*0.21)+( Math.random()-.5)*W*0.055;
+    const yBase=H*(0.72+row*0.07)+( Math.random()-.5)*H*0.035;
+    const stemH=H*(0.22+Math.random()*0.10);
+    roses.push({
+      id:i,
+      // garden position
+      gx:xBase, gy:yBase,
+      stemH,
+      // natural variation
+      scale:0.75+Math.random()*0.45,
+      hueShift:(Math.random()-.5)*14,   // -7 to +7 deg around crimson
+      bloomDelay:i*0.18,               // stagger
+      petalLayers:4+Math.floor(Math.random()*2),
+      // state
+      growProgress:0,   // 0→1 stem/leaf growth
+      bloomProgress:0,  // 0→1 petal open
+      cut:false,
+      cutAnim:0,        // small jolt when cut
+      floatP:0,         // 0→1 float to bouquet
+      // bouquet target (set later)
+      bx:0,by:0,bAngle:0,
+      // scissors sub-state
+      _sp:'move',
+      _sc:0,
+    });
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ROSE DRAWING — PREMIUM QUALITY
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function eio(t){return t<.5?2*t*t:-1+(4-2*t)*t}
+function lerp(a,b,t){return a+(b-a)*t}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+
+// Draw a single rose bloom at (cx,cy), radius r, bloom 0→1, hueShift
+function drawBloom(ctx,cx,cy,r,bloom,hs){
+  if(bloom<.02)return;
+  ctx.save();ctx.translate(cx,cy);
+  const LAYERS=5;
+  const petalsPerLayer=[6,7,8,9,10];
+  // outer→inner
+  for(let L=LAYERS-1;L>=0;L--){
+    // how open is this layer?  outer layers open first
+    const layerT=clamp((bloom-(L/(LAYERS*1.3)))/(1/LAYERS),0,1);
+    if(layerT<=0)continue;
+    const np=petalsPerLayer[L];
+    const layerRad=r*(0.22+L*0.18)*eio(layerT);
+    const petalLen=r*(0.45+L*0.06);
+    const petalWid=r*(0.18+L*0.04);
+    const baseHue=358+hs;
+    const lightBase=22+L*5;
+    for(let p=0;p<np;p++){
+      const ang=(p/np)*Math.PI*2+(L*0.33)+(hs*0.02);
+      const ox=Math.cos(ang)*layerRad;
+      const oy=Math.sin(ang)*layerRad;
+      ctx.save();
+      ctx.translate(ox,oy);
+      ctx.rotate(ang+Math.PI/2);
+      // petal gradient
+      const pg=ctx.createLinearGradient(0,petalLen*.5,0,-petalLen*.55);
+      pg.addColorStop(0,`hsl(${baseHue},85%,${lightBase-4}%)`);
+      pg.addColorStop(.4,`hsl(${baseHue},88%,${lightBase+8}%)`);
+      pg.addColorStop(1,`hsl(${baseHue},80%,${lightBase+18}%)`);
+      // petal shape — teardrop bezier
+      ctx.beginPath();
+      ctx.moveTo(0,petalLen*.48);
+      ctx.bezierCurveTo(-petalWid*.9,petalLen*.1,-petalWid,-(petalLen*.5),0,-(petalLen*.55));
+      ctx.bezierCurveTo(petalWid,-(petalLen*.5),petalWid*.9,petalLen*.1,0,petalLen*.48);
+      ctx.fillStyle=pg;ctx.fill();
+      // vein
+      ctx.beginPath();ctx.moveTo(0,petalLen*.4);ctx.lineTo(0,-petalLen*.48);
+      ctx.strokeStyle=`hsla(${baseHue},60%,${lightBase-10}%,.2)`;ctx.lineWidth=.7;ctx.stroke();
+      // edge highlight
+      ctx.beginPath();
+      ctx.moveTo(0,petalLen*.48);
+      ctx.bezierCurveTo(petalWid*.9,petalLen*.1,petalWid,-(petalLen*.5),0,-(petalLen*.55));
+      ctx.strokeStyle=`hsla(${baseHue},50%,${lightBase+28}%,.18)`;ctx.lineWidth=1;ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // center rosette
+  if(bloom>.15){
+    const cr=r*.16*bloom;
+    const cg=ctx.createRadialGradient(0,0,0,0,0,cr);
+    cg.addColorStop(0,`hsl(${358+hs},72%,18%)`);
+    cg.addColorStop(1,`hsl(${358+hs},82%,28%)`);
+    ctx.beginPath();ctx.arc(0,0,cr,0,Math.PI*2);ctx.fillStyle=cg;ctx.fill();
+  }
+  // bud cap (early stage)
+  if(bloom<.38){
+    const bc=1-bloom/.38;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0,r*.08,r*.28*bc,r*.42*bc,0,0,Math.PI*2);
+    ctx.fillStyle=`hsl(118,44%,${16+bc*5}%)`;ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// Draw stem + leaves for rose at garden position
+function drawStemLeaves(ctx,rose){
+  const {gx,gy,stemH,growProgress:gp,scale,hueShift:hs}=rose;
+  if(gp<.01)return;
+  const tipY=gy-stemH*gp;
+  const sw=2.8*scale;
+  // stem curve
+  const cpx=gx+sw*2,cpy=gy-stemH*gp*.5;
+  // gradient stem
+  const sg=ctx.createLinearGradient(gx,gy,gx,tipY);
+  sg.addColorStop(0,'#1a3a10');sg.addColorStop(.5,'#2d6b1e');sg.addColorStop(1,'#3a8a26');
+  ctx.beginPath();
+  ctx.moveTo(gx,gy);
+  ctx.quadraticCurveTo(cpx,cpy,gx,tipY);
+  ctx.strokeStyle=sg;ctx.lineWidth=sw;ctx.lineCap='round';ctx.stroke();
+  // stem highlight
+  ctx.beginPath();ctx.moveTo(gx+sw*.3,gy);ctx.quadraticCurveTo(cpx+sw*.3,cpy,gx+sw*.3,tipY);
+  ctx.strokeStyle='rgba(120,200,80,.14)';ctx.lineWidth=sw*.5;ctx.stroke();
+
+  // leaves (2 pairs)
+  if(gp>.3){
+    const la=clamp((gp-.3)/.55,0,1);
+    const lr=stemH*scale;
+    [[.35,.42,.45],[.6,.65,.65]].forEach(([sy,sx_sign,size],li)=>{
+      const lBase=gp*stemH;
+      [-1,1].forEach(side=>{
+        const lx=gx,ly=gy-lBase*sy;
+        const lLen=lr*size*la*(li===0?.55:.45);
+        const ang=side*(.55+li*.15);
+        ctx.save();ctx.translate(lx,ly);ctx.rotate(ang);
+        const lg=ctx.createLinearGradient(0,0,lLen,0);
+        lg.addColorStop(0,'#2d6b1e');lg.addColorStop(.5,'#3a8a26');lg.addColorStop(1,'#4aaa32');
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.bezierCurveTo(lLen*.3,-lLen*.22,lLen*.7,-lLen*.18,lLen,0);
+        ctx.bezierCurveTo(lLen*.7,lLen*.14,lLen*.3,lLen*.12,0,0);
+        ctx.fillStyle=lg;ctx.fill();
+        // midrib
+        ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(lLen,0);
+        ctx.strokeStyle='rgba(20,80,10,.3)';ctx.lineWidth=.8;ctx.stroke();
+        ctx.restore();
+      });
+    });
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// SCISSORS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function drawScissors(ctx,x,y,bladeAng){
+  ctx.save();ctx.translate(x,y);ctx.rotate(-Math.PI/2);// tip points up
+  const gold=ctx.createLinearGradient(-20,0,20,0);
+  gold.addColorStop(0,'#7a5a00');gold.addColorStop(.25,'#e8c84a');
+  gold.addColorStop(.5,'#fff5b0');gold.addColorStop(.75,'#c8922a');gold.addColorStop(1,'#e8c84a');
+
+  [-1,1].forEach(side=>{
+    ctx.save();ctx.rotate(side*bladeAng);
+    // handle oval
+    ctx.beginPath();ctx.ellipse(0,62,10,18,0,0,Math.PI*2);
+    ctx.fillStyle=gold;ctx.fill();ctx.strokeStyle='#7a5a00';ctx.lineWidth=1;ctx.stroke();
+    // finger hole
+    ctx.beginPath();ctx.ellipse(0,62,5,9,0,0,Math.PI*2);
+    ctx.strokeStyle='#a07820';ctx.lineWidth=1.2;ctx.stroke();
+    // pivot screw
+    ctx.beginPath();ctx.arc(0,34,6,0,Math.PI*2);ctx.fillStyle='#c8922a';ctx.fill();
+    ctx.beginPath();ctx.arc(0,34,3,0,Math.PI*2);ctx.fillStyle='#fff5b0';ctx.fill();
+    // blade
+    ctx.beginPath();
+    ctx.moveTo(0,34);
+    ctx.bezierCurveTo(side*8,22,side*10,-12,side*3.5,-60);
+    ctx.bezierCurveTo(side*2,-64,0,-63,0,-60);
+    ctx.bezierCurveTo(-side*1,-12,-side*1,18,0,34);
+    ctx.fillStyle=gold;ctx.fill();ctx.strokeStyle='#7a5a00';ctx.lineWidth=.9;ctx.stroke();
+    // blade shine
+    ctx.beginPath();ctx.moveTo(side*1.5,22);ctx.bezierCurveTo(side*4,2,side*5,-22,side*2.5,-56);
+    ctx.strokeStyle='rgba(255,248,180,.65)';ctx.lineWidth=1.8;ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BOUQUET LAYOUT — 25 roses arranged in dome
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function layoutBouquet(){
+  const cx=W/2,cy=H*.40;
+  // concentric rings: 1 center + ring of 6 + ring of 10 + ring of 8
+  const rings=[
+    {count:1,r:0},
+    {count:6,r:.085},
+    {count:10,r:.165},
+    {count:8,r:.235}
+  ];
+  let idx=0;
+  rings.forEach(({count,r})=>{
+    const radius=Math.min(W,H)*r;
+    for(let i=0;i<count&&idx<NROSES;i++,idx++){
+      const ang=(i/count)*Math.PI*2-(Math.PI/2)+(Math.random()-.5)*.25;
+      roses[idx].bx=cx+Math.cos(ang)*radius+(Math.random()-.5)*8;
+      roses[idx].by=cy+Math.sin(ang)*radius*.75+(Math.random()-.5)*8;
+      // slight random tilt
+      roses[idx].bAngle=(Math.random()-.5)*.45;
+    }
+  });
+  // remaining roses go at outer ring
+  while(idx<NROSES){
+    const ang=(idx/NROSES)*Math.PI*2;
+    roses[idx].bx=cx+Math.cos(ang)*Math.min(W,H)*.26;
+    roses[idx].by=cy+Math.sin(ang)*Math.min(W,H)*.19;
+    roses[idx].bAngle=(Math.random()-.5)*.5;
+    idx++;
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// WRAP & RIBBON
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function drawWrap(ctx,p,cx,cy){
+  if(p<=0)return;
+  const R=Math.min(W,H);
+  const roseArea=R*.19;
+  const wrapBase=cy+roseArea*.6;
+  const wrapH=R*.32;
+  const wW=R*.32;
+
+  ctx.save();
+  // Right flap
+  const rp=clamp(p*2,0,1);
+  if(rp>0){
+    ctx.save();
+    const rg=ctx.createLinearGradient(cx,wrapBase,cx+wW*rp,wrapBase);
+    rg.addColorStop(0,'rgba(255,255,255,.92)');rg.addColorStop(.5,'rgba(248,248,255,.97)');
+    rg.addColorStop(1,'rgba(230,230,250,.88)');
+    ctx.beginPath();
+    ctx.moveTo(cx-5,wrapBase);
+    ctx.lineTo(cx+wW*rp,wrapBase-wrapH*.12*rp);
+    ctx.lineTo(cx+wW*rp,wrapBase+wrapH*rp);
+    ctx.lineTo(cx-5,wrapBase+wrapH*rp);
+    ctx.closePath();
+    ctx.fillStyle=rg;ctx.fill();
+    ctx.strokeStyle='rgba(200,200,230,.3)';ctx.lineWidth=.8;ctx.stroke();
+    // fold crease
+    ctx.beginPath();ctx.moveTo(cx,wrapBase);ctx.lineTo(cx,wrapBase+wrapH*rp);
+    ctx.strokeStyle='rgba(210,210,240,.4)';ctx.lineWidth=1.2;ctx.stroke();
+    ctx.restore();
+  }
+  // Left flap
+  const lp=clamp((p-.2)*2,0,1);
+  if(lp>0){
+    ctx.save();
+    const lg=ctx.createLinearGradient(cx-wW*lp,wrapBase,cx,wrapBase);
+    lg.addColorStop(0,'rgba(230,230,250,.88)');lg.addColorStop(.5,'rgba(248,248,255,.97)');
+    lg.addColorStop(1,'rgba(255,255,255,.92)');
+    ctx.beginPath();
+    ctx.moveTo(cx+5,wrapBase);
+    ctx.lineTo(cx-wW*lp,wrapBase-wrapH*.12*lp);
+    ctx.lineTo(cx-wW*lp,wrapBase+wrapH*lp);
+    ctx.lineTo(cx+5,wrapBase+wrapH*lp);
+    ctx.closePath();
+    ctx.fillStyle=lg;ctx.fill();
+    ctx.strokeStyle='rgba(200,200,230,.3)';ctx.lineWidth=.8;ctx.stroke();
+    ctx.restore();
+  }
+  // pearl shimmer sweep
+  if(p>.6){
+    const sp=(p-.6)/.4;
+    const sx=cx-wW+wW*2*sp;
+    const shg=ctx.createLinearGradient(sx-25,wrapBase,sx+25,wrapBase+wrapH);
+    shg.addColorStop(0,'rgba(255,255,255,0)');
+    shg.addColorStop(.5,'rgba(255,255,255,.55)');
+    shg.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.beginPath();ctx.rect(sx-25,wrapBase-5,50,wrapH+10);
+    ctx.fillStyle=shg;ctx.fill();
+  }
+  // glitter sparkles on wrap
+  if(p>.3&&Math.random()<.25){
+    const sx=cx+(Math.random()-.5)*wW*1.8;
+    const sy=wrapBase+Math.random()*wrapH;
+    ctx.beginPath();ctx.arc(sx,sy,Math.random()*2.5+.5,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${Math.random()*.8+.2})`;ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRibbon(ctx,p,cx,cy){
+  if(p<=0)return;
+  const R=Math.min(W,H);
+  const roseArea=R*.19;
+  const ry=cy+roseArea*.62;
+  const bandW=R*.38;
+  const bandH=R*.038;
+  ctx.save();
+
+  const gold=ctx.createLinearGradient(cx-bandW/2,ry,cx+bandW/2,ry+bandH);
+  gold.addColorStop(0,'#7a5a00');gold.addColorStop(.2,'#e8c84a');
+  gold.addColorStop(.5,'#fff5b0');gold.addColorStop(.8,'#c8922a');gold.addColorStop(1,'#e8c84a');
+
+  // Band
+  const bp=clamp(p*2,0,1);
+  ctx.beginPath();
+  ctx.rect(cx-bandW/2*bp,ry,bandW*bp,bandH);
+  ctx.fillStyle=gold;ctx.fill();
+
+  // Bow (appears after band)
+  const bowP=clamp((p-.5)*2,0,1);
+  if(bowP>0){
+    const br=R*.055*bowP;
+    const bcy=ry+bandH/2;
+    // Left loop
+    ctx.save();ctx.translate(cx,bcy);
+    ctx.beginPath();ctx.ellipse(-br*.9,-br*.55,br*.85,br*.52,-.55,0,Math.PI*2);
+    ctx.fillStyle=gold;ctx.globalAlpha=.92;ctx.fill();
+    ctx.strokeStyle='#7a5a00';ctx.lineWidth=.8;ctx.stroke();
+    ctx.restore();
+    // Right loop
+    ctx.save();ctx.translate(cx,bcy);
+    ctx.beginPath();ctx.ellipse(br*.9,-br*.55,br*.85,br*.52,.55,0,Math.PI*2);
+    ctx.fillStyle=gold;ctx.globalAlpha=.92;ctx.fill();
+    ctx.strokeStyle='#7a5a00';ctx.lineWidth=.8;ctx.stroke();
+    ctx.restore();
+    // Knot
+    ctx.save();ctx.translate(cx,bcy-br*.35);
+    ctx.beginPath();ctx.ellipse(0,0,br*.22,br*.28,0,0,Math.PI*2);
+    ctx.fillStyle='#fff5b0';ctx.globalAlpha=1;ctx.fill();
+    ctx.strokeStyle='#c8922a';ctx.lineWidth=.8;ctx.stroke();
+    ctx.restore();
+    // Trailing tails
+    ctx.save();ctx.translate(cx,bcy);
+    [-1,1].forEach(s=>{
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.bezierCurveTo(s*br*.3,br*.6,s*br*.8,br*.9,s*br*.6,br*1.4*bowP);
+      ctx.strokeStyle=gold;ctx.lineWidth=bandH*.7;ctx.lineCap='round';ctx.stroke();
+    });
+    ctx.restore();
+    // Shine sweep across ribbon
+    if(p>.88){
+      const sp=(p-.88)/.12;
+      const sx=cx-bandW/2+bandW*sp;
+      const shg=ctx.createLinearGradient(sx-18,ry,sx+18,ry+bandH);
+      shg.addColorStop(0,'rgba(255,248,180,0)');shg.addColorStop(.5,'rgba(255,248,180,.85)');shg.addColorStop(1,'rgba(255,248,180,0)');
+      ctx.beginPath();ctx.rect(sx-18,ry-2,36,bandH+4);ctx.fillStyle=shg;ctx.globalAlpha=.9;ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FX — fireworks, sparkles
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let particles=[],fxSparkles=[];
+
+function burst(x,y){
+  const n=60+Math.floor(Math.random()*35);
+  for(let i=0;i<n;i++){
+    const ang=(i/n)*Math.PI*2;
+    const spd=2.8+Math.random()*5.5;
+    const hg=Math.random()<.72;
+    const col=hg?`hsl(${44+Math.random()*18},100%,${58+Math.random()*28}%)`
+                 :`hsl(${Math.random()*360},85%,65%)`;
+    particles.push({
+      x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
+      life:1,decay:.011+Math.random()*.013,
+      col,r:1.8+Math.random()*2.2,trail:[]
+    });
+  }
+}
+
+function addFxSparkle(x,y,gold=true){
+  fxSparkles.push({
+    x,y,life:1,r:1.5+Math.random()*3.5,
+    ang:Math.random()*Math.PI*2,decay:.02+Math.random()*.025,
+    col:gold?'#f5d060':`hsl(${Math.random()*360},80%,70%)`
+  });
+}
+
+function tickFX(dt){
+  particles=particles.filter(p=>p.life>0);
+  particles.forEach(p=>{
+    p.trail.push({x:p.x,y:p.y});
+    if(p.trail.length>6)p.trail.shift();
+    p.x+=p.vx;p.y+=p.vy;p.vy+=.065;p.vx*=.987;
+    p.life-=p.decay;
+  });
+  fxSparkles=fxSparkles.filter(s=>s.life>0);
+  fxSparkles.forEach(s=>{s.life-=s.decay;s.r*=.975;});
+}
+
+function drawFX(){
+  X3.clearRect(0,0,W*DPR,H*DPR); X3.setTransform(DPR,0,0,DPR,0,0);
+  // trails
+  particles.forEach(p=>{
+    for(let t=1;t<p.trail.length;t++){
+      const ta=(t/p.trail.length)*p.life*.35;
+      X3.beginPath();X3.moveTo(p.trail[t-1].x,p.trail[t-1].y);X3.lineTo(p.trail[t].x,p.trail[t].y);
+      const cs=p.col.replace('hsl(','hsla(').replace(')',`,${ta})`);
+      X3.strokeStyle=cs;X3.lineWidth=p.r*.5;X3.stroke();
+    }
+    X3.beginPath();X3.arc(p.x,p.y,Math.max(.3,p.r*p.life),0,Math.PI*2);
+    const cf=p.col.replace('hsl(','hsla(').replace(')',`,${p.life})`);
+    X3.fillStyle=cf;X3.fill();
+  });
+  // 4-point stars
+  fxSparkles.forEach(s=>{
+    X3.save();X3.translate(s.x,s.y);X3.rotate(s.ang);X3.globalAlpha=s.life;
+    for(let pt=0;pt<4;pt++){
+      X3.save();X3.rotate(pt*Math.PI/2);
+      X3.beginPath();X3.moveTo(0,0);X3.lineTo(-s.r*.12,s.r*.12);X3.lineTo(0,s.r);X3.lineTo(s.r*.12,s.r*.12);X3.closePath();
+      X3.fillStyle=s.col;X3.fill();X3.restore();
+    }
+    X3.restore();
+  });
+}
+
+// ambient sparkles scattered
+function randomSparkle(){
+  const rx=W*.05+Math.random()*W*.9;
+  const ry=H*.05+Math.random()*H*.9;
+  addFxSparkle(rx,ry,Math.random()>.3);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BACKGROUND
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function drawBG(){
+  X0.clearRect(0,0,W*DPR,H*DPR); X0.setTransform(DPR,0,0,DPR,0,0);
+  const bg=X0.createRadialGradient(W/2,H*.7,0,W/2,H*.7,Math.max(W,H)*.9);
+  bg.addColorStop(0,'#140500');bg.addColorStop(.5,'#080200');bg.addColorStop(1,'#000');
+  X0.fillStyle=bg;X0.fillRect(0,0,W,H);
+  // subtle vignette
+  const vg=X0.createRadialGradient(W/2,H/2,H*.2,W/2,H/2,Math.max(W,H)*.8);
+  vg.addColorStop(0,'transparent');vg.addColorStop(1,'rgba(0,0,0,.6)');
+  X0.fillStyle=vg;X0.fillRect(0,0,W,H);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// STATE MACHINE
+// Timeline:  0  grow(0-5)  bloom(5-9)  scissors(9-13)  float(13-16)  wrap(16-18)  ribbon(18-19)  celebrate(19-30)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const T_GROW_END=5,T_BLOOM_END=9,T_SCISSORS_END=13,T_FLOAT_END=16,
+      T_WRAP_END=18,T_RIBBON_END=19,T_END=30;
+
+let now=0,last=0,raf=null;
+let scissorsX=-140,scissorsY=0,scissorsBlade=0;
+let scissorsRoseIdx=0;
+let wrapProg=0,ribbonProg=0;
+let fireworksOn=false,fwTimer=0,kissTimer=0;
+
+const msg=document.getElementById('msg');
+const rpBtn=document.getElementById('replay');
+
+rpBtn.addEventListener('click',()=>{
+  rpBtn.classList.remove('show');
+  msg.classList.remove('show');
+  document.querySelectorAll('.kiss').forEach(k=>k.remove());
+  if(audioCtx){try{audioCtx.close();}catch(e){} audioCtx=null;}
+  init();
+});
+
+function init(){
+  now=0;last=0;
+  particles=[];fxSparkles=[];
+  fireworksOn=false;fwTimer=0;kissTimer=0;
+  wrapProg=0;ribbonProg=0;
+  scissorsX=-140;
+  scissorsRoseIdx=0;
+  resize();
+  seedRoses();
+  if(raf)cancelAnimationFrame(raf);
+  raf=requestAnimationFrame(frame);
+}
+
+function spawnKiss(){
+  const el=document.createElement('div');el.className='kiss';
+  el.textContent=['💋','💕','✨','💖','🌹','💐'][Math.floor(Math.random()*6)];
+  el.style.left=(8+Math.random()*84)+'%';
+  el.style.bottom=(4+Math.random()*18)+'%';
+  const d=3.5+Math.random()*3.5;
+  el.style.animationDuration=d+'s';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),(d+.3)*1000);
+}
+
+function frame(ts){
+  if(!last)last=ts;
+  const dt=Math.min((ts-last)/1000,.05);
+  last=ts;
+  now+=dt;
+
+  drawBG();
+  X1.clearRect(0,0,W*DPR,H*DPR); X1.setTransform(DPR,0,0,DPR,0,0);
+  X2.clearRect(0,0,W*DPR,H*DPR); X2.setTransform(DPR,0,0,DPR,0,0);
+
+  const cx=W/2,cy=H*.40;
+
+  // ── Phase 1: GROW (0–5s) ───────────────────────
+  if(now<=T_GROW_END){
+    const t=now/T_GROW_END;
+    roses.forEach((rose,i)=>{
+      const d=i/NROSES*.55;
+      rose.growProgress=clamp((t-d)/(1-d+.01),0,1);
+      rose.bloomProgress=0;
+      drawStemLeaves(X1,rose);
+      // tiny bud at tip
+      const tipY=rose.gy-rose.stemH*rose.growProgress;
+      const br=Math.min(W,H)*.028*rose.scale*rose.growProgress;
+      if(rose.growProgress>.2) drawBloom(X1,rose.gx,tipY,br,.04*rose.growProgress,rose.hueShift);
+    });
+  }
+
+  // ── Phase 2: BLOOM (5–9s) ──────────────────────
+  else if(now<=T_BLOOM_END){
+    const t=(now-T_GROW_END)/(T_BLOOM_END-T_GROW_END);
+    roses.forEach((rose,i)=>{
+      rose.growProgress=1;
+      const d=i/NROSES*.55;
+      rose.bloomProgress=eio(clamp((t-d)/(1-d+.01),0,1));
+      drawStemLeaves(X1,rose);
+      const tipY=rose.gy-rose.stemH;
+      const r=Math.min(W,H)*.048*rose.scale;
+      drawBloom(X1,rose.gx,tipY,r,rose.bloomProgress,rose.hueShift);
+    });
+  }
+
+  // ── Phase 3: SCISSORS (9–13s) ──────────────────
+  else if(now<=T_SCISSORS_END){
+    // draw all uncut roses (stems + blooms)
+    roses.forEach((rose,i)=>{
+      if(!rose.cut){
+        drawStemLeaves(X1,rose);
+        const tipY=rose.gy-rose.stemH;
+        const r=Math.min(W,H)*.048*rose.scale;
+        drawBloom(X1,rose.gx,tipY,r,1,rose.hueShift);
+      } else {
+        // cut rose hovers at cut-height, fades upward slightly
+        if(rose.cutAnim<1) rose.cutAnim=Math.min(1,rose.cutAnim+dt*1.8);
+        const floatUp=rose.cutAnim*12;
+        const tipY=rose.gy-rose.stemH-floatUp;
+        const r=Math.min(W,H)*.048*rose.scale;
+        X1.save();X1.globalAlpha=1;
+        drawBloom(X1,rose.gx,tipY,r,1,rose.hueShift);
+        X1.restore();
+        // fallen bottom stub jolt
+        if(rose.cutAnim<.4){
+          X1.save();
+          X1.translate(rose.gx,(rose.gy-20)+(1-rose.cutAnim)*15);
+          X1.globalAlpha=1-rose.cutAnim*1.5;
+          X1.strokeStyle='#2d6b1e';X1.lineWidth=2.5;X1.lineCap='round';
+          X1.beginPath();X1.moveTo(0,0);X1.lineTo(0,20);X1.stroke();
+          X1.restore();
+        }
+      }
+    });
+
+    // Scissors logic
+    const rose=roses[scissorsRoseIdx];
+    if(rose){
+      const targetX=rose.gx;
+      const targetY=rose.gy-22; // near bottom of stem
+      if(scissorsRoseIdx===0&&scissorsX<-80) {
+        scissorsX=-120;scissorsY=H*.82;
+        rose._sp='move';rose._sc=0;
+      }
+
+      if(rose._sp==='move'){
+        const dx=targetX-scissorsX,dy=targetY-scissorsY;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>6){
+          const spd=Math.min(dist*5*dt,dist*.9);
+          scissorsX+=(dx/dist)*spd;scissorsY+=(dy/dist)*spd;
+          scissorsBlade=0;
+        } else {
+          rose._sp='open';rose._sc=0;
+        }
+      } else if(rose._sp==='open'){
+        rose._sc+=dt*3.5;
+        scissorsBlade=clamp(rose._sc,0,1);
+        if(rose._sc>=.8){rose._sp='close';}
+      } else if(rose._sp==='close'){
+        rose._sc+=dt*3;
+        scissorsBlade=clamp(1-( rose._sc-.8)/.8,0,1);
+        if(rose._sc>=1.6){
+          rose.cut=true;rose.cutAnim=0;
+          scissorsRoseIdx++;
+          if(scissorsRoseIdx<NROSES){
+            roses[scissorsRoseIdx]._sp='move';roses[scissorsRoseIdx]._sc=0;
+          }
+          scissorsBlade=0;
+        }
+      }
+      drawScissors(X2,scissorsX,scissorsY,scissorsBlade*.42);
+    } else {
+      // All cut — hide scissors
+      X2.clearRect(0,0,W,H);
+    }
+  }
+
+  // ── Phase 4: FLOAT to BOUQUET (13–16s) ─────────
+  else if(now<=T_FLOAT_END){
+    if(!roses[0].bx) layoutBouquet();
+    const t=eio(clamp((now-T_SCISSORS_END)/(T_FLOAT_END-T_SCISSORS_END),0,1));
+    roses.forEach((rose,i)=>{
+      const delay=i/NROSES*.35;
+      const lp=eio(clamp((t-delay)/(1-delay+.01),0,1));
+      const startY=rose.gy-rose.stemH-rose.cutAnim*12;
+      const fx=lerp(rose.gx,rose.bx,lp);
+      const fy=lerp(startY,rose.by,lp);
+      const fr=Math.min(W,H)*.048*rose.scale*lerp(1,.82,lp);
+      X1.save();X1.translate(fx,fy);X1.rotate(rose.bAngle*lp);
+      drawBloom(X1,0,0,fr,1,rose.hueShift);
+      X1.restore();
+    });
+  }
+
+  // ── Phase 5: WRAP (16–18s) ──────────────────────
+  else if(now<=T_WRAP_END){
+    wrapProg=clamp((now-T_FLOAT_END)/(T_WRAP_END-T_FLOAT_END),0,1);
+    roses.forEach(rose=>{
+      const r=Math.min(W,H)*.048*rose.scale*.82;
+      X1.save();X1.translate(rose.bx,rose.by);X1.rotate(rose.bAngle);
+      drawBloom(X1,0,0,r,1,rose.hueShift);X1.restore();
+    });
+    drawWrap(X1,wrapProg,cx,cy);
+    // wrap-time sparkles
+    if(Math.random()<.3){
+      const a=Math.random()*Math.PI*2;
+      const rd=Math.min(W,H)*(.18+Math.random()*.06);
+      addFxSparkle(cx+Math.cos(a)*rd,cy+Math.sin(a)*rd*.7+rd*.5);
+    }
+  }
+
+  // ── Phase 6: RIBBON (18–19s) ────────────────────
+  else if(now<=T_RIBBON_END){
+    ribbonProg=clamp((now-T_WRAP_END)/(T_RIBBON_END-T_WRAP_END),0,1);
+    roses.forEach(rose=>{
+      const r=Math.min(W,H)*.048*rose.scale*.82;
+      X1.save();X1.translate(rose.bx,rose.by);X1.rotate(rose.bAngle);
+      drawBloom(X1,0,0,r,1,rose.hueShift);X1.restore();
+    });
+    drawWrap(X1,1,cx,cy);
+    drawRibbon(X1,ribbonProg,cx,cy);
+    // bow sparkle burst
+    if(ribbonProg>.85&&Math.random()<.12){
+      const R=Math.min(W,H);
+      addFxSparkle(cx+(Math.random()-.5)*R*.1,cy+R*.06,true);
+    }
+  }
+
+  // ── Phase 7+8: CELEBRATION (19–30s) ─────────────
+  else if(now<=T_END){
+    if(!fireworksOn){
+      fireworksOn=true;
+      playBirthdaySong();
+      msg.classList.add('show');
+      // initial ribbon sparkle burst
+      for(let i=0;i<8;i++) addFxSparkle(cx+(Math.random()-.5)*80,cy+Math.min(W,H)*.07,true);
+    }
+    // static bouquet
+    roses.forEach(rose=>{
+      const r=Math.min(W,H)*.048*rose.scale*.82;
+      X1.save();X1.translate(rose.bx,rose.by);X1.rotate(rose.bAngle);
+      drawBloom(X1,0,0,r,1,rose.hueShift);X1.restore();
+    });
+    drawWrap(X1,1,cx,cy);
+    drawRibbon(X1,1,cx,cy);
+    // fireworks
+    fwTimer+=dt;
+    if(fwTimer>(.7+Math.random()*.6)){
+      burst(W*(.12+Math.random()*.76),H*(.06+Math.random()*.38));
+      fwTimer=0;
+    }
+    // ambient sparkles
+    if(Math.random()<.07) randomSparkle();
+    // kisses
+    kissTimer+=dt;
+    if(kissTimer>1.1+Math.random()*.9){spawnKiss();kissTimer=0;}
+  }
+
+  // ── DONE ─────────────────────────────────────────
+  else {
+    // Freeze final scene
+    roses.forEach(rose=>{
+      const r=Math.min(W,H)*.048*rose.scale*.82;
+      X1.save();X1.translate(rose.bx,rose.by);X1.rotate(rose.bAngle);
+      drawBloom(X1,0,0,r,1,rose.hueShift);X1.restore();
+    });
+    drawWrap(X1,1,cx,cy);drawRibbon(X1,1,cx,cy);
+    // slow fireworks
+    fwTimer+=dt;if(fwTimer>2){burst(W*(.15+Math.random()*.7),H*(.08+Math.random()*.3));fwTimer=0;}
+    kissTimer+=dt;if(kissTimer>2.5){spawnKiss();kissTimer=0;}
+    if(Math.random()<.04) randomSparkle();
+    rpBtn.classList.add('show');
+  }
+
+  tickFX(dt);drawFX();
+  raf=requestAnimationFrame(frame);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// GO
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+init();
+</script>
+</body>
+</html>
